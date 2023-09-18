@@ -1,0 +1,22 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+{% load static %}
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Convert?</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for i in data %}
+
+
+    <tr>
+      <td>{{ i.video_name }}</td>
+      <td><a href="{{ i.id }}"><img src = "{% static 'videoplayer/images/play.svg' %}"></a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock  %}

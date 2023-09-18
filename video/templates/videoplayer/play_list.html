@@ -1,0 +1,28 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+{% load static %}
+
+<link href="{% static 'videoplayer/css/video-js.css' %}" rel="stylesheet" />
+<section id="team" class="pb-5">
+    <div class="container">
+        <h3 class="section-title">Videos</h3>
+        <div class="row">
+{% for path in video_items %}
+            <div class="col-xs-12 col-sm-6 col-md-4">
+
+                            <div class="card" id="container">
+                                <div class="card-body text-center">
+                                    <a href="/videoplayer/{{ path.id }}">
+                                    <p><img class="img-fluid" src="{{ path.poster_path }}" alt="{{ path.video_name }}"></p>
+                                    <h4 class="card-title">{{ path.video_name }}</h4>
+                                    </a>
+                                    <img src="{% static 'videoplayer/images/trash.svg' %}" id="img2">
+                                </div>
+                            </div>
+            </div>
+
+{% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock  %}

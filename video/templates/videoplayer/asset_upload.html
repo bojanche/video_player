@@ -1,0 +1,12 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+{% load static %}
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+  </form>
+
+  <p><a href="{% url 'videoplayer:video_playlist' %}">Return to home</a></p>
+
+{% endblock  %}

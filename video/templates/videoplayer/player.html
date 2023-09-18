@@ -1,0 +1,37 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+{% load static %}
+
+<link href="{% static 'videoplayer/css/video-js.css' %}" rel="stylesheet" />
+<div class="container">
+        <video id="my-video"
+            class="video-js vjs-default-skin"
+            controls="True"
+            volume="1"
+            preload="true"
+            autoplay="false"
+            width="320"
+            height="180"
+            poster="{{ item.poster_path }}"
+            data-setup='{}' >
+            <source src="{{ item.file_path }}" type="application/x-mpegURL" />
+            <p class="vjs-no-js">
+              To view this video please enable JavaScript, and consider upgrading to a
+              web browser that
+              <a href="https://videojs.com/html5-video-support/" target="_blank"
+                >supports HTML5 video</a
+              >
+            </p>
+          </video>
+        <input type=button value="Previous Page" onClick="location.href='{% url 'videoplayer:video_playlist' %}'">
+</div>
+<script src="{% static 'videoplayer/js/video.min.js' %}" ></script>
+<script src="{% static 'videoplayer/js/videojs-contrib-hls.min.js' %}" ></script>
+
+<script>
+var player = videojs('my-video', {
+  responsive: true
+});
+player.play();
+</script>
+{% endblock  %}
