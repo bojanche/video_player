@@ -2,36 +2,39 @@
 {% block body_block %}
 {% load static %}
 
-<link href="{% static 'videoplayer/css/video-js.css' %}" rel="stylesheet" />
-<div class="container">
-        <video id="my-video"
-            class="video-js vjs-default-skin"
-            controls="True"
-            volume="1"
-            preload="true"
-            autoplay="false"
-            width="320"
-            height="180"
-            poster="{{ item.poster_path }}"
-            data-setup='{}' >
-            <source src="{{ item.file_path }}" type="application/x-mpegURL" />
-            <p class="vjs-no-js">
-              To view this video please enable JavaScript, and consider upgrading to a
-              web browser that
-              <a href="https://videojs.com/html5-video-support/" target="_blank"
-                >supports HTML5 video</a
-              >
-            </p>
-          </video>
-        <input type=button value="Previous Page" onClick="location.href='{% url 'videoplayer:video_playlist' %}'">
-</div>
-<script src="{% static 'videoplayer/js/video.min.js' %}" ></script>
-<script src="{% static 'videoplayer/js/videojs-contrib-hls.min.js' %}" ></script>
+<link href="{% static 'videoplayer/css/video-js.css' %}" rel="stylesheet">
 
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-muted small fw-semibold mb-1">Now playing</p>
+        <h1 class="h3 mb-0">{{ item.video_name }}</h1>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Back to library</a>
+</div>
+
+<div class="player-card shadow-sm">
+    <video id="my-video"
+        class="video-js vjs-default-skin vjs-big-play-centered w-100"
+        controls
+        volume="1"
+        preload="auto"
+        poster="{{ item.poster_path }}"
+        data-setup='{}'>
+        <source src="{{ item.file_path }}" type="application/x-mpegURL">
+        <p class="vjs-no-js">
+            To view this video please enable JavaScript, and consider upgrading to a
+            <a href="https://videojs.com/html5-video-support/" target="_blank" rel="noreferrer">browser that supports HTML5 video</a>.
+        </p>
+    </video>
+</div>
+
+<script src="{% static 'videoplayer/js/video.min.js' %}"></script>
+<script src="{% static 'videoplayer/js/videojs-contrib-hls.min.js' %}"></script>
 <script>
 var player = videojs('my-video', {
-  responsive: true
+    fluid: true,
+    responsive: true
 });
 player.play();
 </script>
-{% endblock  %}
+{% endblock %}

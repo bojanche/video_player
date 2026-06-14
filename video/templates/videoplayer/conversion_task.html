@@ -1,22 +1,182 @@
 {% extends "videoplayer/base.html" %}
 {% block body_block %}
 {% load static %}
-<table class="table">
-  <thead>
-    <tr>
-      <th scope="col">Name</th>
-      <th scope="col">Convert?</th>
-    </tr>
-  </thead>
-  <tbody>
-  {% for i in data %}
 
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-muted small fw-semibold mb-1">Admin</p>
+        <h1 class="h2 mb-0">Conversion tasks</h1>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Back to library</a>
+</div>
 
-    <tr>
-      <td>{{ i.video_name }}</td>
-      <td><a href="{{ i.id }}"><img src = "{% static 'videoplayer/images/play.svg' %}"></a></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endblock  %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Name</th>
+                    <th class="text-end" scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for task in tasks %}
+                <tr>
+                    <td class="fw-semibold">{{ task.video.video_name }}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-primary conversion-start {% if task.progress.status == 'running' %}disabled{% endif %}"
+                           href="{{ task.video.id }}"
+                           data-video-id="{{ task.video.id }}"
+                           data-progress-url="{% url 'videoplayer:conversion_task_progress' task.video.id %}"
+                           data-status="{{ task.progress.status }}"
+                           data-resume="true"
+                           {% if task.progress.status == 'running' %}aria-disabled="true"{% endif %}>
+                            {% if task.progress.status == 'running' %}
+                                Converting...
+                            {% elif task.progress.status == 'error' %}
+                                Retry
+                            {% else %}
+                                <img class="btn-icon" src="{% static 'videoplayer/images/play.svg' %}" alt="">
+                                Convert
+                            {% endif %}
+                        </a>
+                        {% if gpu_encoder %}
+                            <a class="btn btn-sm btn-outline-primary conversion-start {% if task.progress.status == 'running' %}disabled{% endif %}"
+                               href="{{ task.video.id }}?gpu=1"
+                               data-video-id="{{ task.video.id }}"
+                               data-progress-url="{% url 'videoplayer:conversion_task_progress' task.video.id %}"
+                               data-status="{{ task.progress.status }}"
+                               title="Use {{ gpu_encoder.label }}"
+                               {% if task.progress.status == 'running' %}aria-disabled="true"{% endif %}>
+                                Convert with GPU
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="conversion-progress-row" id="conversion-progress-row-{{ task.video.id }}" {% if task.progress.status == 'idle' %}hidden{% endif %}>
+                    <td colspan="2">
+                        <div class="conversion-progress">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-semibold text-muted" id="conversion-status-{{ task.video.id }}">{{ task.progress.message }}</span>
+                                <span class="small text-muted" id="conversion-percent-{{ task.video.id }}">{{ task.progress.percent }}%</span>
+                            </div>
+                            <div class="progress" role="progressbar" aria-label="Conversion progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ task.progress.percent }}">
+                                <div class="progress-bar progress-bar-striped {% if task.progress.status != 'complete' and task.progress.status != 'error' %}progress-bar-animated{% endif %} {% if task.progress.status == 'complete' %}bg-success{% elif task.progress.status == 'error' %}bg-danger{% endif %}"
+                                     id="conversion-progress-bar-{{ task.video.id }}"
+                                     style="width: {{ task.progress.percent }}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="2" class="text-center text-muted py-5">No pending conversion tasks.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(function () {
+    function setConversionProgress(videoId, percent, message, status) {
+        var row = document.getElementById('conversion-progress-row-' + videoId);
+        var progress = row.querySelector('.progress');
+        var progressBar = document.getElementById('conversion-progress-bar-' + videoId);
+        var statusText = document.getElementById('conversion-status-' + videoId);
+        var percentText = document.getElementById('conversion-percent-' + videoId);
+        var rounded = Math.max(0, Math.min(100, Math.round(percent || 0)));
+
+        row.hidden = false;
+        progress.setAttribute('aria-valuenow', rounded);
+        progressBar.style.width = rounded + '%';
+        percentText.textContent = rounded + '%';
+        statusText.textContent = message || 'Converting...';
+
+        progressBar.classList.toggle('bg-success', status === 'complete');
+        progressBar.classList.toggle('bg-danger', status === 'error');
+        progressBar.classList.toggle('progress-bar-animated', status !== 'complete' && status !== 'error');
+    }
+
+    function pollProgress(videoId, progressUrl, button) {
+        fetch(progressUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (data) {
+                setConversionProgress(videoId, data.percent, data.message, data.status);
+
+                if (data.status === 'complete') {
+                    button.textContent = 'Done';
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 1200);
+                    return;
+                }
+
+                if (data.status === 'error') {
+                    button.disabled = false;
+                    button.classList.remove('disabled');
+                    button.textContent = 'Retry';
+                    return;
+                }
+
+                window.setTimeout(function () {
+                    pollProgress(videoId, progressUrl, button);
+                }, 1000);
+            })
+            .catch(function () {
+                setConversionProgress(videoId, 0, 'Could not read conversion progress.', 'error');
+                button.disabled = false;
+                button.classList.remove('disabled');
+                button.textContent = 'Retry';
+            });
+    }
+
+    document.querySelectorAll('.conversion-start').forEach(function (button) {
+        if (button.dataset.status === 'running' && button.dataset.resume === 'true') {
+            button.classList.add('disabled');
+            pollProgress(button.dataset.videoId, button.dataset.progressUrl, button);
+        }
+
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            if (button.classList.contains('disabled')) {
+                return;
+            }
+
+            var videoId = button.dataset.videoId;
+            var progressUrl = button.dataset.progressUrl;
+
+            button.classList.add('disabled');
+            button.textContent = 'Starting...';
+            setConversionProgress(videoId, 0, 'Starting conversion...', 'running');
+
+            fetch(button.href, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Could not start conversion.');
+                    }
+                    button.textContent = 'Converting...';
+                    pollProgress(videoId, progressUrl, button);
+                })
+                .catch(function () {
+                    setConversionProgress(videoId, 0, 'Could not start conversion.', 'error');
+                    button.classList.remove('disabled');
+                    button.textContent = 'Retry';
+                });
+        });
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+            <div>
+                <p class="text-uppercase text-muted small fw-semibold mb-1">Video settings</p>
+                <h1 class="h3 mb-0">{{ item.video_name }}</h1>
+            </div>
+            <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Back to library</a>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4 p-md-5">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.video_name.id_for_label }}">{{ form.video_name.label }}</label>
+                        {{ form.video_name }}
+                        {% if form.video_name.errors %}
+                            <div class="invalid-feedback d-block">{{ form.video_name.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label" for="{{ form.poster_image.id_for_label }}">{{ form.poster_image.label }}</label>
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-5">
+                                <img class="img-fluid rounded border video-edit-poster" src="{{ item.poster_path }}" alt="{{ item.video_name }}">
+                            </div>
+                            <div class="col-md-7">
+                                {{ form.poster_image }}
+                                {% if form.poster_image.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.poster_image.errors|striptags }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">Save changes</button>
+                        <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card border-danger shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5">Converted asset</h2>
+                <p class="text-muted mb-3">Remove the generated HLS files and poster, keep the uploaded source file, and send this video back to conversion tasks.</p>
+                <form method="post" action="{% url 'videoplayer:video_remove_converted_asset' item.id %}" onsubmit="return confirm('Remove the converted asset for this video? The uploaded source file will be kept.');">
+                    {% csrf_token %}
+                    <button class="btn btn-outline-danger" type="submit">Remove converted asset</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

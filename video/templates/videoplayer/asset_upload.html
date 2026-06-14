@@ -1,12 +1,114 @@
 {% extends "videoplayer/base.html" %}
 {% block body_block %}
-{% load static %}
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Upload</button>
-  </form>
 
-  <p><a href="{% url 'videoplayer:video_playlist' %}">Return to home</a></p>
+<div class="row justify-content-center">
+    <div class="col-lg-7 col-xl-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h3 mb-4">Upload video</h1>
+                <form id="upload-form" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <div class="form-text">{{ field.help_text }}</div>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <div id="upload-progress" class="upload-progress mb-3" hidden>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span id="upload-status" class="small fw-semibold text-muted">Preparing upload...</span>
+                            <span id="upload-percent" class="small text-muted">0%</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="Upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button id="upload-submit" class="btn btn-primary" type="submit">Upload</button>
+                        <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
-{% endblock  %}
+<script>
+(function () {
+    var form = document.getElementById('upload-form');
+    var submitButton = document.getElementById('upload-submit');
+    var progressWrap = document.getElementById('upload-progress');
+    var progress = progressWrap.querySelector('.progress');
+    var progressBar = document.getElementById('upload-progress-bar');
+    var uploadStatus = document.getElementById('upload-status');
+    var uploadPercent = document.getElementById('upload-percent');
+
+    function setProgress(percent) {
+        var rounded = Math.max(0, Math.min(100, Math.round(percent)));
+        progress.setAttribute('aria-valuenow', rounded);
+        progressBar.style.width = rounded + '%';
+        uploadPercent.textContent = rounded + '%';
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        var formData = new FormData(form);
+        var request = new XMLHttpRequest();
+
+        progressWrap.hidden = false;
+        submitButton.disabled = true;
+        submitButton.textContent = 'Uploading...';
+        uploadStatus.textContent = 'Uploading video...';
+        setProgress(0);
+
+        request.upload.addEventListener('progress', function (event) {
+            if (event.lengthComputable) {
+                setProgress((event.loaded / event.total) * 100);
+            } else {
+                progressBar.style.width = '100%';
+                uploadPercent.textContent = '';
+                uploadStatus.textContent = 'Uploading video...';
+            }
+        });
+
+        request.addEventListener('load', function () {
+            if (request.status >= 200 && request.status < 300) {
+                uploadStatus.textContent = 'Upload complete. Redirecting...';
+                setProgress(100);
+
+                if (request.responseURL && request.responseURL !== window.location.href) {
+                    window.location.assign(request.responseURL);
+                    return;
+                }
+
+                document.open();
+                document.write(request.responseText);
+                document.close();
+                return;
+            }
+
+            uploadStatus.textContent = 'Upload failed. Please try again.';
+            submitButton.disabled = false;
+            submitButton.textContent = 'Upload';
+        });
+
+        request.addEventListener('error', function () {
+            uploadStatus.textContent = 'Upload failed. Please check your connection and try again.';
+            submitButton.disabled = false;
+            submitButton.textContent = 'Upload';
+        });
+
+        request.open('POST', form.action || window.location.href);
+        request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        request.send(formData);
+    });
+})();
+</script>
+{% endblock %}

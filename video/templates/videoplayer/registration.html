@@ -1,18 +1,40 @@
 {% extends "videoplayer/base.html" %}
 {% load static %}
 {% block body_block %}
-<div class="wrapper fadeInDown">
-{% if registered %}
-    <h1>Thank you for registering</h1>
-{% else %}
-    <h1>Register here.</h1>
-    <h3>Fill out the form:</h3>
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ user_form.as_p }}
-        {{ profile_form.as_p }}
-        <input type="submit" name="" value="Register">
-    </form>
-{% endif %}
+
+<div class="auth-card card shadow-sm mx-auto">
+    <div class="card-body p-4 p-md-5">
+        {% if registered %}
+            <div class="text-center py-4">
+                <h1 class="h3">Thank you for registering</h1>
+                <a class="btn btn-primary mt-3" href="{% url 'user_login' %}">Sign in</a>
+            </div>
+        {% else %}
+            <h1 class="h3 text-center mb-2">Register</h1>
+            <p class="text-muted text-center mb-4">Create your account to use the video library.</p>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for field in user_form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                {% for field in profile_form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <button class="btn btn-primary w-100" type="submit">Register</button>
+            </form>
+        {% endif %}
+    </div>
 </div>
-{% endblock  %}
+{% endblock %}
