@@ -93,7 +93,7 @@ def asset_upload(request):
         form = AssetUploadForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            return redirect('videoplayer:video_playlist')
+            return redirect('videoplayer:conversion_task')
     else:
         form = AssetUploadForm()
     return render(request, 'videoplayer/asset_upload.html', {'form':form})

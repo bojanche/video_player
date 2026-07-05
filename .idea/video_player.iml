@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/video" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/video/media" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.14 (video_player)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
