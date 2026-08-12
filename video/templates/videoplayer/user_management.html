@@ -1,0 +1,60 @@
+{% extends "videoplayer/base.html" %}
+{% block body_block %}
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-muted small fw-semibold mb-1">Management</p>
+        <h1 class="h2 mb-0">Users</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{% url 'videoplayer:user_management_add' %}">Add user</a>
+        <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Back to library</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Username</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Roles</th>
+                    <th class="text-end" scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for managed_user in managed_users %}
+                <tr>
+                    <td class="fw-semibold">{{ managed_user.username }}</td>
+                    <td>{{ managed_user.email|default:"-" }}</td>
+                    <td>
+                        {% if managed_user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if managed_user.is_superuser %}
+                            <span class="badge bg-danger">Superuser</span>
+                        {% endif %}
+                        {% if managed_user.is_staff %}
+                            <span class="badge bg-primary">Staff</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'videoplayer:user_management_edit' managed_user.id %}">Edit</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-5">No users found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
