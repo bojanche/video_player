@@ -57,6 +57,16 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
         #     stderr=subprocess.PIPE,
         #     universal_newlines=True,
         # )
+        encoder_options = []
+        if encoder == 'libx264':
+            encoder_options = ["-preset", "medium", "-pix_fmt", "yuv420p"]
+        elif encoder == 'h264_nvenc':
+            encoder_options = ["-preset", "p4", "-pix_fmt", "yuv420p"]
+        elif encoder == 'h264_qsv':
+            encoder_options = ["-pix_fmt", "nv12"]
+        elif encoder == 'h264_amf':
+            encoder_options = ["-quality", "balanced", "-pix_fmt", "yuv420p"]
+
         cmd = [
             "ffmpeg",
             "-y",
@@ -71,9 +81,8 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
             "-map", "[v1]", "-map", "0:a",
             "-map", "[v2]", "-map", "0:a",
 
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-pix_fmt", "yuv420p",
+            "-c:v", encoder,
+            *encoder_options,
 
             "-g", "60",
             "-keyint_min", "60",
@@ -175,7 +184,14 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
         relative_path_video = file_path.relative_to(home_dir).as_posix()
         relative_path_poster = poster_path.relative_to(home_dir).as_posix()
         # end tweaking locations
-        kveri = VideoLocations(file_path='/'+relative_path_video, video_category='Movies', poster_path='/'+relative_path_poster, video_name=vid_asset.video_name)
+        kveri = VideoLocations(
+            file_path='/'+relative_path_video,
+            video_category='Movies',
+            poster_path='/'+relative_path_poster,
+            video_name=vid_asset.video_name,
+            owner=vid_asset.owner,
+            is_public=vid_asset.is_public,
+        )
         kveri.save()
         conversion_progress.complete(video_id)
         # print("Putanja m3u8:", ulazni_path / 'index.m3u8', " Poster:", ulazni_path / 'output.jpg')

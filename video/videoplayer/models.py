@@ -9,6 +9,8 @@ class VideoLocations(models.Model):
     video_name = models.CharField(max_length=200)
     video_category = models.CharField(max_length=50)
     poster_path = models.CharField(max_length=255, default='0')
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    is_public = models.BooleanField(default=True)
 
     def __str__(self):
         return self.video_name
@@ -31,3 +33,5 @@ class VideoFileUpload(models.Model):
     file_item = models.FileField(upload_to='%Y%m%d%H%M%S%f')
     uploaded_at = models.DateTimeField(auto_now_add=True)
     converted = models.BooleanField(default=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    is_public = models.BooleanField(default=False)

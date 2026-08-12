@@ -6,10 +6,10 @@
 
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
     <div>
-        <p class="text-uppercase text-muted small fw-semibold mb-1">Library</p>
-        <h1 class="h2 mb-0">Videos</h1>
+        <p class="text-uppercase text-muted small fw-semibold mb-1">{% if user.is_authenticated %}My library{% else %}Public library{% endif %}</p>
+        <h1 class="h2 mb-0">{% if user.is_authenticated %}Videos{% else %}Public videos{% endif %}</h1>
     </div>
-    {% if user.is_superuser %}
+    {% if user.is_authenticated %}
         <a class="btn btn-primary" href="{% url 'videoplayer:asset_upload' %}">Upload video</a>
     {% endif %}
 </div>
@@ -19,29 +19,40 @@
         {% for path in video_items %}
             <div class="col-12 col-sm-6 col-lg-4">
                 <article class="card video-card h-100 shadow-sm">
-                    {% if user.is_superuser %}
-                        <div class="dropdown video-card-menu">
-                            <button class="btn btn-light btn-sm video-card-menu-button" type="button" id="video-menu-{{ path.id }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Video actions">
-                                &#8942;
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="video-menu-{{ path.id }}">
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'videoplayer:video_edit' path.id %}">Edit</a>
-                                </li>
-                                <li>
-                                    <form method="post" action="{% url 'videoplayer:video_delete' path.id %}" onsubmit="return confirm('Delete this video and all files in its media folder? This cannot be undone.');">
-                                        {% csrf_token %}
-                                        <button class="dropdown-item text-danger" type="submit">Delete</button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </div>
+                    {% if not is_public_page and user.is_authenticated %}
+                        {% if user.is_superuser or path.owner_id == user.id %}
+                            <div class="dropdown video-card-menu">
+                                <button class="btn btn-light btn-sm video-card-menu-button" type="button" id="video-menu-{{ path.id }}" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Video actions">
+                                    &#8942;
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="video-menu-{{ path.id }}">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'videoplayer:video_edit' path.id %}">Edit</a>
+                                    </li>
+                                    <li>
+                                        <form method="post" action="{% url 'videoplayer:video_delete' path.id %}" onsubmit="return confirm('Delete this video and all files in its media folder? This cannot be undone.');">
+                                            {% csrf_token %}
+                                            <button class="dropdown-item text-danger" type="submit">Delete</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        {% endif %}
                     {% endif %}
                     <a class="ratio ratio-16x9 video-poster-link" href="{% url 'videoplayer:videoplayer' path.id %}" aria-label="Play {{ path.video_name }}">
                         <img src="{{ path.poster_path }}" class="card-img-top" alt="{{ path.video_name }}">
                     </a>
                     <div class="card-body d-flex align-items-start justify-content-between gap-3">
-                        <a class="video-title" href="{% url 'videoplayer:videoplayer' path.id %}">{{ path.video_name }}</a>
+                        <div>
+                            <a class="video-title" href="{% url 'videoplayer:videoplayer' path.id %}">{{ path.video_name }}</a>
+                            {% if path.is_public %}
+                                <div class="small text-muted mt-1">
+                                    Public, created by {{ path.owner.username|default:"unknown" }}
+                                </div>
+                            {% elif user.is_authenticated %}
+                                <div class="small text-muted mt-1">Private</div>
+                            {% endif %}
+                        </div>
                         <img class="video-action-icon" src="{% static 'videoplayer/images/play.svg' %}" alt="">
                     </div>
                 </article>
@@ -50,8 +61,8 @@
     </div>
 {% else %}
     <div class="empty-state text-center p-5">
-        <h2 class="h4">No videos yet</h2>
-        <p class="text-muted mb-0">Uploaded and converted videos will appear here.</p>
+        <h2 class="h4">{% if user.is_authenticated %}No videos yet{% else %}No public videos yet{% endif %}</h2>
+        <p class="text-muted mb-0">{% if user.is_authenticated %}Uploaded and converted videos will appear here.{% else %}Public videos will appear here once users share them.{% endif %}</p>
     </div>
 {% endif %}
 {% endblock %}

@@ -24,6 +24,16 @@
                     </div>
 
                     <div class="mb-4">
+                        <div class="form-check">
+                            {{ form.is_public }}
+                            <label class="form-check-label" for="{{ form.is_public.id_for_label }}">Make video public</label>
+                        </div>
+                        {% if form.is_public.errors %}
+                            <div class="invalid-feedback d-block">{{ form.is_public.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
                         <label class="form-label" for="{{ form.poster_image.id_for_label }}">{{ form.poster_image.label }}</label>
                         <div class="row g-3 align-items-center">
                             <div class="col-md-5">

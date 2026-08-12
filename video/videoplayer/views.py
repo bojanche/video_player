@@ -1,9 +1,11 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, user_passes_test
-from .forms import UserForm, UserProfileInfoForm, AssetUploadForm, VideoLocationEditForm
+from django.db.models import Q
+from .forms import UserForm, UserProfileInfoForm, AssetUploadForm, VideoLocationEditForm, UserManagementForm, UserManagementCreateForm
 from django.urls import reverse
-from django.http import HttpResponseRedirect, HttpResponse, JsonResponse
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponseForbidden, JsonResponse
 from .models import VideoLocations, VideoFileUpload
 from .converter import converter
 from . import conversion_progress
@@ -15,16 +17,20 @@ import threading
 # Create your views here.
 
 
-@login_required
 def video_playlist(request):
-    video_items = VideoLocations.objects.all()
-    return render(request, 'videoplayer/play_list.html', {"video_items": video_items})
+    video_items = _visible_videos(request.user)
+    return render(request, 'videoplayer/play_list.html', {
+        "video_items": video_items,
+        "is_public_page": not request.user.is_authenticated,
+    })
 
 
-@login_required
 def videoplayer(request, video_id):
-    print(video_id)
-    item = VideoLocations.objects.get(id=video_id)
+    item = get_object_or_404(VideoLocations, pk=video_id)
+    if not _can_view_video(request.user, item):
+        if not request.user.is_authenticated:
+            return redirect('user_login')
+        return HttpResponseForbidden('You do not have permission to view this video.')
     return render(request, 'videoplayer/player.html', {'item': item})
 
 
@@ -32,10 +38,56 @@ def _superuser_required(user):
     return user.is_authenticated and user.is_superuser
 
 
+def _staff_required(user):
+    return user.is_authenticated and user.is_staff
+
+
 @login_required
-@user_passes_test(_superuser_required)
+@user_passes_test(_staff_required)
+def user_management(request):
+    users = User.objects.order_by('username')
+    return render(request, 'videoplayer/user_management.html', {'managed_users': users})
+
+
+@login_required
+@user_passes_test(_staff_required)
+def user_management_edit(request, user_id):
+    managed_user = get_object_or_404(User, pk=user_id)
+
+    if request.method == 'POST':
+        form = UserManagementForm(request.POST, instance=managed_user, actor=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('videoplayer:user_management')
+    else:
+        form = UserManagementForm(instance=managed_user, actor=request.user)
+
+    return render(request, 'videoplayer/user_management_edit.html', {
+        'form': form,
+        'managed_user': managed_user,
+    })
+
+
+@login_required
+@user_passes_test(_staff_required)
+def user_management_add(request):
+    if request.method == 'POST':
+        form = UserManagementCreateForm(request.POST, actor=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('videoplayer:user_management')
+    else:
+        form = UserManagementCreateForm(actor=request.user, initial={'is_active': True})
+
+    return render(request, 'videoplayer/user_management_edit.html', {
+        'form': form,
+        'managed_user': None,
+    })
+
+
+@login_required
 def video_edit(request, video_id):
-    item = get_object_or_404(VideoLocations, pk=video_id)
+    item = get_object_or_404(_manageable_videos(request.user), pk=video_id)
 
     if request.method == 'POST':
         form = VideoLocationEditForm(request.POST, request.FILES, instance=item)
@@ -44,8 +96,8 @@ def video_edit(request, video_id):
             poster_image = form.cleaned_data.get('poster_image')
             if poster_image:
                 _replace_poster(item, poster_image)
-            _matching_uploads(item).update(video_name=item.video_name)
-            _matching_locations(item).exclude(pk=item.pk).update(video_name=item.video_name)
+            _matching_uploads(item).update(video_name=item.video_name, is_public=item.is_public)
+            _matching_locations(item).exclude(pk=item.pk).update(video_name=item.video_name, is_public=item.is_public)
             return redirect('videoplayer:video_playlist')
     else:
         form = VideoLocationEditForm(instance=item)
@@ -57,9 +109,8 @@ def video_edit(request, video_id):
 
 
 @login_required
-@user_passes_test(_superuser_required)
 def video_remove_converted_asset(request, video_id):
-    item = get_object_or_404(VideoLocations, pk=video_id)
+    item = get_object_or_404(_manageable_videos(request.user), pk=video_id)
     if request.method == 'POST':
         _remove_converted_files(item)
         _matching_uploads(item).update(converted=False)
@@ -69,9 +120,8 @@ def video_remove_converted_asset(request, video_id):
 
 
 @login_required
-@user_passes_test(_superuser_required)
 def video_delete(request, video_id):
-    item = get_object_or_404(VideoLocations, pk=video_id)
+    item = get_object_or_404(_manageable_videos(request.user), pk=video_id)
     if request.method == 'POST':
         asset_dir = _asset_dir(item)
         _matching_uploads(item).delete()
@@ -92,7 +142,9 @@ def asset_upload(request):
     if request.method == 'POST':
         form = AssetUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
+            video_file = form.save(commit=False)
+            video_file.owner = request.user
+            video_file.save()
             return redirect('videoplayer:conversion_task')
     else:
         form = AssetUploadForm()
@@ -113,15 +165,15 @@ def remove_video(request, id):
 
 @login_required
 def conversion_task(request, video_id='None'):
-    data = VideoFileUpload.objects.filter(converted=False)
+    data = _manageable_uploads(request.user).filter(converted=False)
     if request.method == 'GET' and video_id != 'None':
+        to_be_converted = get_object_or_404(data, pk=video_id)
         current_progress = conversion_progress.get(video_id)
         if current_progress['status'] == 'running':
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'started': True, 'video_id': video_id})
             return render(request, 'videoplayer/conversion_task.html', _conversion_task_context(data))
 
-        to_be_converted = VideoFileUpload.objects.get(pk=video_id)
         to_be_converted_file = pathlib.Path(str(to_be_converted.file_item))
         to_be_converted_path = to_be_converted_file.parent
         use_gpu = request.GET.get('gpu') == '1'
@@ -136,6 +188,7 @@ def conversion_task(request, video_id='None'):
 
 @login_required
 def conversion_task_progress(request, video_id):
+    get_object_or_404(_manageable_uploads(request.user), pk=video_id)
     return JsonResponse(conversion_progress.get(video_id))
 
 
@@ -150,6 +203,34 @@ def _conversion_task_context(data):
         'tasks': tasks,
         'gpu_encoder': gpu_encoder(),
     }
+
+
+def _visible_videos(user):
+    if user.is_authenticated and user.is_superuser:
+        return VideoLocations.objects.all()
+    if user.is_authenticated:
+        return VideoLocations.objects.filter(owner=user)
+    return VideoLocations.objects.filter(is_public=True)
+
+
+def _manageable_videos(user):
+    if user.is_superuser:
+        return VideoLocations.objects.all()
+    return VideoLocations.objects.filter(owner=user)
+
+
+def _manageable_uploads(user):
+    if user.is_superuser:
+        return VideoFileUpload.objects.all()
+    return VideoFileUpload.objects.filter(owner=user)
+
+
+def _can_view_video(user, item):
+    if item.is_public:
+        return True
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or item.owner_id == user.id
 
 
 def _asset_dir(item):

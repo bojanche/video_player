@@ -29,7 +29,7 @@ def _encoder_is_usable(encoder):
         '-f',
         'lavfi',
         '-i',
-        'color=c=black:s=64x64:d=0.1',
+        'color=c=black:s=256x256:d=0.1',
         '-frames:v',
         '1',
         '-c:v',
