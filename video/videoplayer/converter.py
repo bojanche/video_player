@@ -174,6 +174,7 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
             .overwrite_output()
             .run(capture_stdout=True, capture_stderr=True)
         )
+        embedded_subtitle_path = _extract_embedded_subtitle(ulazni_fajl, ulazni_path)
         vid_asset = VideoFileUpload.objects.get(pk=video_id)
         vid_asset.converted = True
         vid_asset.save()
@@ -183,6 +184,9 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
         home_dir = pathlib.Path.cwd()
         relative_path_video = file_path.relative_to(home_dir).as_posix()
         relative_path_poster = poster_path.relative_to(home_dir).as_posix()
+        relative_path_subtitle = ''
+        if embedded_subtitle_path:
+            relative_path_subtitle = pathlib.PureWindowsPath(embedded_subtitle_path).relative_to(home_dir).as_posix()
         # end tweaking locations
         kveri = VideoLocations(
             file_path='/'+relative_path_video,
@@ -191,6 +195,7 @@ def converter(ulazni_path, ulazni_fajl, video_id, use_gpu=False):
             video_name=vid_asset.video_name,
             owner=vid_asset.owner,
             is_public=vid_asset.is_public,
+            subtitle_path='/' + relative_path_subtitle if relative_path_subtitle else '',
         )
         kveri.save()
         conversion_progress.complete(video_id)
@@ -223,3 +228,46 @@ def _progress_seconds(key, value):
         return None
 
     return None
+
+
+def _extract_embedded_subtitle(input_file, output_dir):
+    subtitle_stream_count = _subtitle_stream_count(input_file)
+    if subtitle_stream_count == 0:
+        return None
+
+    output_path = pathlib.Path(output_dir) / 'subtitles.vtt'
+    for subtitle_index in range(subtitle_stream_count):
+        result = subprocess.run(
+            [
+                'ffmpeg',
+                '-y',
+                '-i',
+                str(input_file),
+                '-map',
+                '0:s:' + str(subtitle_index),
+                '-c:s',
+                'webvtt',
+                str(output_path),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
+            return output_path
+
+    if output_path.exists():
+        output_path.unlink()
+    return None
+
+
+def _subtitle_stream_count(input_file):
+    try:
+        probe = ffmpeg.probe(input_file)
+    except ffmpeg.Error:
+        return 0
+
+    return len([
+        stream for stream in probe.get('streams', [])
+        if stream.get('codec_type') == 'subtitle'
+    ])

@@ -48,6 +48,28 @@
                         </div>
                     </div>
 
+                    <div class="mb-4">
+                        <label class="form-label" for="{{ form.subtitle_file.id_for_label }}">{{ form.subtitle_file.label }}</label>
+                        {% if item.subtitle_path %}
+                            <div class="text-muted small mb-2">Current subtitle: {{ item.subtitle_path }}</div>
+                        {% endif %}
+                        {{ form.subtitle_file }}
+                        {% if form.subtitle_file.errors %}
+                            <div class="invalid-feedback d-block">{{ form.subtitle_file.errors|striptags }}</div>
+                        {% endif %}
+                        <div class="form-text">Supported formats depend on ffmpeg; SRT, ASS, and WebVTT are commonly supported. Uploaded subtitles are saved as WebVTT.</div>
+                    </div>
+
+                    {% if item.subtitle_path %}
+                        <div class="form-check mb-4">
+                            {{ form.delete_subtitle }}
+                            <label class="form-check-label" for="{{ form.delete_subtitle.id_for_label }}">{{ form.delete_subtitle.label }}</label>
+                            {% if form.delete_subtitle.errors %}
+                                <div class="invalid-feedback d-block">{{ form.delete_subtitle.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary" type="submit">Save changes</button>
                         <a class="btn btn-outline-secondary" href="{% url 'videoplayer:video_playlist' %}">Cancel</a>

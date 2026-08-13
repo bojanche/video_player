@@ -21,6 +21,43 @@ a {
     letter-spacing: .01em;
 }
 
+.user-menu-button {
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+}
+
+.user-menu-button:focus {
+    box-shadow: 0 0 0 .25rem rgba(255, 255, 255, .18);
+}
+
+.user-menu-avatar {
+    align-items: center;
+    background: #f8fafc;
+    border: 2px solid rgba(255, 255, 255, .5);
+    border-radius: 999px;
+    color: #172033;
+    display: inline-flex;
+    height: 2.25rem;
+    justify-content: center;
+    object-fit: cover;
+    width: 2.25rem;
+}
+
+.user-menu-avatar-placeholder {
+    background: #fff;
+    border-color: rgba(255, 255, 255, .9);
+    color: #0f172a;
+}
+
+.account-photo-preview {
+    border: 3px solid #e2e8f0;
+    border-radius: 999px;
+    height: 7rem;
+    object-fit: cover;
+    width: 7rem;
+}
+
 .auth-card {
     max-width: 460px;
     border: 0;
@@ -131,6 +168,28 @@ a {
 
 .player-card .video-js {
     background-color: #0f172a;
+}
+
+.player-card-narrow {
+    max-width: 860px;
+}
+
+.player-card-narrow .video-js {
+    height: 70vh !important;
+    max-height: 70vh;
+    min-height: 0;
+    padding-top: 0 !important;
+}
+
+.player-card-narrow .vjs-tech {
+    height: 100% !important;
+    object-fit: contain;
+    position: static;
+    width: 100% !important;
+}
+
+.player-card-narrow .vjs-fluid {
+    padding-top: 0;
 }
 
 .table > :not(caption) > * > * {

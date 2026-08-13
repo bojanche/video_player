@@ -4,6 +4,11 @@
 <div class="auth-card card shadow-sm mx-auto">
     <div class="card-body p-4 p-md-5">
         <h1 class="h3 text-center mb-4">Sign in</h1>
+        {% if login_error %}
+            <div class="alert alert-danger" role="alert">
+                {{ login_error }}
+            </div>
+        {% endif %}
         <form method="POST" action="{% url 'user_login' %}">
             {% csrf_token %}
             <div class="mb-3">

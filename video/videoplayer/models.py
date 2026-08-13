@@ -11,6 +11,7 @@ class VideoLocations(models.Model):
     poster_path = models.CharField(max_length=255, default='0')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     is_public = models.BooleanField(default=True)
+    subtitle_path = models.CharField(max_length=255, blank=True, default='')
 
     def __str__(self):
         return self.video_name

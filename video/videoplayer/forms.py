@@ -28,6 +28,15 @@ class UserProfileInfoForm(forms.ModelForm):
         }
 
 
+class UserPhotoForm(forms.ModelForm):
+    class Meta:
+        model = UserProfileInfo
+        fields = ('profile_pic',)
+        widgets = {
+            'profile_pic': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
+
+
 class UserManagementForm(forms.ModelForm):
     class Meta:
         model = User
@@ -106,6 +115,16 @@ class VideoLocationEditForm(forms.ModelForm):
         required=False,
         label='Video poster',
         widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
+    )
+    subtitle_file = forms.FileField(
+        required=False,
+        label='Subtitle file',
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
+    )
+    delete_subtitle = forms.BooleanField(
+        required=False,
+        label='Delete current subtitle',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 
     class Meta:

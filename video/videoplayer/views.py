@@ -1,17 +1,20 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Q
-from .forms import UserForm, UserProfileInfoForm, AssetUploadForm, VideoLocationEditForm, UserManagementForm, UserManagementCreateForm
+from .forms import UserForm, UserProfileInfoForm, UserPhotoForm, AssetUploadForm, VideoLocationEditForm, UserManagementForm, UserManagementCreateForm
 from django.urls import reverse
 from django.http import HttpResponseRedirect, HttpResponse, HttpResponseForbidden, JsonResponse
-from .models import VideoLocations, VideoFileUpload
+from .models import UserProfileInfo, VideoLocations, VideoFileUpload
 from .converter import converter
 from . import conversion_progress
 from .ffmpeg_capabilities import gpu_encoder
 import pathlib
 import shutil
+import subprocess
 from video.settings import MEDIA_ROOT
 import threading
 # Create your views here.
@@ -96,8 +99,24 @@ def video_edit(request, video_id):
             poster_image = form.cleaned_data.get('poster_image')
             if poster_image:
                 _replace_poster(item, poster_image)
+            if form.cleaned_data.get('delete_subtitle'):
+                _delete_subtitle(item)
+            subtitle_file = form.cleaned_data.get('subtitle_file')
+            if subtitle_file:
+                try:
+                    _replace_subtitle(item, subtitle_file)
+                except subprocess.CalledProcessError as exc:
+                    form.add_error('subtitle_file', _subtitle_error(exc))
+                    return render(request, 'videoplayer/video_edit.html', {
+                        'form': form,
+                        'item': item,
+                    })
             _matching_uploads(item).update(video_name=item.video_name, is_public=item.is_public)
-            _matching_locations(item).exclude(pk=item.pk).update(video_name=item.video_name, is_public=item.is_public)
+            _matching_locations(item).exclude(pk=item.pk).update(
+                video_name=item.video_name,
+                is_public=item.is_public,
+                subtitle_path=item.subtitle_path,
+            )
             return redirect('videoplayer:video_playlist')
     else:
         form = VideoLocationEditForm(instance=item)
@@ -135,6 +154,35 @@ def video_delete(request, video_id):
 def user_logout(request):
     logout(request)
     return HttpResponseRedirect(reverse('videoplayer:video_playlist'))
+
+
+@login_required
+def account_password(request):
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+            return redirect('videoplayer:video_playlist')
+    else:
+        form = PasswordChangeForm(request.user)
+
+    _style_password_form(form)
+    return render(request, 'videoplayer/account_password.html', {'form': form})
+
+
+@login_required
+def account_photo(request):
+    profile, created = UserProfileInfo.objects.get_or_create(user=request.user)
+    if request.method == 'POST':
+        form = UserPhotoForm(request.POST, request.FILES, instance=profile)
+        if form.is_valid():
+            form.save()
+            return redirect('videoplayer:video_playlist')
+    else:
+        form = UserPhotoForm(instance=profile)
+
+    return render(request, 'videoplayer/account_photo.html', {'form': form, 'profile': profile})
 
 
 @login_required
@@ -233,6 +281,11 @@ def _can_view_video(user, item):
     return user.is_superuser or item.owner_id == user.id
 
 
+def _style_password_form(form):
+    for field in form.fields.values():
+        field.widget.attrs.update({'class': 'form-control'})
+
+
 def _asset_dir(item):
     media_root = MEDIA_ROOT.resolve()
     item_path = pathlib.Path(item.file_path.lstrip('/'))
@@ -248,6 +301,18 @@ def _poster_path(item):
     if media_root != poster_path.parent and media_root not in poster_path.parents:
         raise ValueError('Refusing to operate outside MEDIA_ROOT.')
     return poster_path
+
+
+def _subtitle_path(item):
+    if item.subtitle_path:
+        subtitle_path = (pathlib.Path.cwd() / pathlib.Path(item.subtitle_path.lstrip('/'))).resolve()
+    else:
+        subtitle_path = (_asset_dir(item) / 'subtitles.vtt').resolve()
+
+    media_root = MEDIA_ROOT.resolve()
+    if media_root != subtitle_path.parent and media_root not in subtitle_path.parents:
+        raise ValueError('Refusing to operate outside MEDIA_ROOT.')
+    return subtitle_path
 
 
 def _matching_uploads(item):
@@ -267,10 +332,55 @@ def _replace_poster(item, poster_image):
             destination.write(chunk)
 
 
+def _replace_subtitle(item, subtitle_file):
+    asset_dir = _asset_dir(item)
+    source_path = asset_dir / ('subtitle_upload' + pathlib.Path(subtitle_file.name).suffix.lower())
+    output_path = _subtitle_path(item)
+
+    with source_path.open('wb+') as destination:
+        for chunk in subtitle_file.chunks():
+            destination.write(chunk)
+
+    try:
+        subprocess.run(
+            ['ffmpeg', '-y', '-i', str(source_path), str(output_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+    finally:
+        if source_path.exists():
+            source_path.unlink()
+
+    relative_path = pathlib.PureWindowsPath(output_path).relative_to(pathlib.Path.cwd()).as_posix()
+    item.subtitle_path = '/' + relative_path
+    item.save(update_fields=['subtitle_path'])
+
+
+def _subtitle_error(exc):
+    message = exc.stderr.strip() if exc.stderr else ''
+    if not message:
+        return 'Could not convert subtitle file to WebVTT.'
+    return 'Could not convert subtitle file to WebVTT: ' + message.splitlines()[-1]
+
+
+def _delete_subtitle(item):
+    if not item.subtitle_path:
+        return
+
+    subtitle_path = _subtitle_path(item)
+    if subtitle_path.exists():
+        subtitle_path.unlink()
+    item.subtitle_path = ''
+    item.save(update_fields=['subtitle_path'])
+
+
 def _remove_converted_files(item):
     asset_dir = _asset_dir(item)
     for path in asset_dir.iterdir():
-        if path.is_file() and (path.name == 'output.jpg' or path.name == 'master.m3u8' or path.suffix == '.ts'):
+        if path.is_file() and (path.name == 'output.jpg' or path.name == 'master.m3u8' or path.name == 'subtitles.vtt' or path.suffix == '.ts'):
             path.unlink()
         if path.is_dir() and (path.name == 'v0' or path.name == 'v1' or path.name == 'v2'):
             shutil.rmtree(path, ignore_errors=True)
@@ -321,6 +431,8 @@ def user_login(request):
                 HttpResponse('Account is not active!!!')
         else:
             print('Login failed!!!')
-            return HttpResponse('Invalid login details provided!')
+            return render(request, 'videoplayer/login.html', {
+                'login_error': 'Invalid login details provided.',
+            })
     else:
         return render(request, 'videoplayer/login.html', {})
